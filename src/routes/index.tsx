@@ -7,7 +7,7 @@ import { Box } from "@gluestack-ui/themed";
 
 export function Routes() {
     const theme = DefaultTheme
-    theme.colors.background = gluestackUIConfig.tokens.colors.gray600
+    theme.colors.background = gluestackUIConfig.tokens.colors.gray700
 
     return (
         <Box flex={1} bg="$gray600">
