@@ -5,11 +5,17 @@ import Logo from "@assets/logo.svg";
 import { Input } from "@components/Input";
 import { Button } from "@components/Button";
 
+import { useNavigation } from "@react-navigation/native";
+import { AuthNavigatorRoutesProps } from "@routes/auth.routes";
+
 export function SignUp() {
+    const navigation = useNavigation<AuthNavigatorRoutesProps>()
+    const handleGoback = () => navigation.goBack();
+
     return (
-        <ScrollView contentContainerStyle={{flexGrow: 1}} 
-        showsVerticalScrollIndicator={false}>
-            <VStack flex={1} bg="$gray500">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}>
+            <VStack flex={1}>
                 <Image
                     source={BackgroudImg}
                     alt="Pessoas treinando"
@@ -44,8 +50,8 @@ export function SignUp() {
                         <Button title="Criar e acessar" />
                     </Center>
 
-                    <Button title="Voltar para login" variant="outline" mt="$12" />
-                    
+                    <Button title="Voltar para login" variant="outline" mt="$12" onPress={handleGoback} />
+
                 </VStack>
             </VStack>
         </ScrollView>
