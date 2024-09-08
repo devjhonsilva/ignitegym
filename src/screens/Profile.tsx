@@ -38,8 +38,8 @@ export function Profile() {
                 if (photoInfo && (photoInfo.size / 1024 / 1024) > 1) {
                     return toast.show({
                         placement: "top",
-                        render: ({id}) => (
-                            <ToastMessage 
+                        render: ({ id }) => (
+                            <ToastMessage
                                 id={id}
                                 action="error"
                                 title="Imagem muito grande!"

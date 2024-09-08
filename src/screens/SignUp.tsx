@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { VStack, Image, Center, Text, Heading, ScrollView } from "@gluestack-ui/themed"
+import { VStack, Image, Center, Text, Heading, ScrollView, useToast, Toast, ToastTitle, ToastDescription } from "@gluestack-ui/themed"
 import { useForm, Controller } from 'react-hook-form';
 import * as yup from "yup";
-import {yupResolver} from '@hookform/resolvers/yup';
+import { yupResolver } from '@hookform/resolvers/yup';
 
 import BackgroudImg from "@assets/background.png"
 import Logo from "@assets/logo.svg";
 import { Input } from "@components/Input";
 import { Button } from "@components/Button";
+import { api } from "../service/api";
 
 import { useNavigation } from "@react-navigation/native";
 import { AuthNavigatorRoutesProps } from "@routes/auth.routes";
+import { AppError } from "@utils/AppError";
+import { ToastMessage } from "@components/ToastMessage";
 
-type FormDataProps ={
+type FormDataProps = {
     name: string;
     email: string;
     password: string;
@@ -29,17 +32,36 @@ const signUpSchema = yup.object({
 })
 
 export function SignUp() {
+    const toast = useToast();
+
     const navigation = useNavigation<AuthNavigatorRoutesProps>()
     const handleGoback = () => navigation.goBack();
 
-    const { control, handleSubmit, formState: {errors} } = useForm<FormDataProps>({
+    const { control, handleSubmit, formState: { errors } } = useForm<FormDataProps>({
         resolver: yupResolver(signUpSchema)
     });
 
-    const handleSignUp = ({name, email, password, passwordConfirm}: FormDataProps) => {
-        console.log({
-            name , email , password, passwordConfirm
-        })
+    const handleSignUp = async ({ name, email, password }: FormDataProps) => {
+
+        try {
+            const response = await api.post('/users', { name, email, password });
+
+            console.log(response.data);
+        } catch (error) {
+            const isAppError = error instanceof AppError;
+            const message: string = isAppError ? error.message : 'Não foi possível criar a conta. Tente novamente mais tarde.';
+
+            toast.show({
+                placement: 'top',
+                render: ({ id }) => (
+                    <ToastMessage
+                        id={id}
+                        action="error"
+                        title={message}
+                    />
+                )
+            })
+        }
     }
 
     return (
