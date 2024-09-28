@@ -14,6 +14,7 @@ import { useNavigation } from "@react-navigation/native";
 import { AuthNavigatorRoutesProps } from "@routes/auth.routes";
 import { AppError } from "@utils/AppError";
 import { ToastMessage } from "@components/ToastMessage";
+import { useAuth } from "@hooks/useAuth";
 
 type FormDataProps = {
     name: string;
@@ -32,8 +33,9 @@ const signUpSchema = yup.object({
 })
 
 export function SignUp() {
+    const { signIn } = useAuth();
     const toast = useToast();
-
+    const [isLoading, setIsLoading] = useState(false);
     const navigation = useNavigation<AuthNavigatorRoutesProps>()
     const handleGoback = () => navigation.goBack();
 
@@ -44,10 +46,14 @@ export function SignUp() {
     const handleSignUp = async ({ name, email, password }: FormDataProps) => {
 
         try {
-            const response = await api.post('/users', { name, email, password });
+            setIsLoading(true);
 
-            console.log(response.data);
+            await api.post('/users', { name, email, password });
+
+            await signIn(email, password);
+
         } catch (error) {
+            setIsLoading(false);
             const isAppError = error instanceof AppError;
             const message: string = isAppError ? error.message : 'Não foi possível criar a conta. Tente novamente mais tarde.';
 
@@ -145,7 +151,7 @@ export function SignUp() {
                                 />
                             )}
                         />
-                        <Button title="Criar e acessar" onPress={handleSubmit(handleSignUp)} />
+                        <Button title="Criar e acessar" onPress={handleSubmit(handleSignUp)} isLoading={isLoading} />
                     </Center>
 
                     <Button title="Voltar para login" variant="outline" mt="$12" onPress={handleGoback} />
