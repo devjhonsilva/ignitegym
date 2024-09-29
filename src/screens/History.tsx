@@ -1,20 +1,47 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { SectionList } from "react-native";
 import { HistoryCard } from "@components/HistoryCard";
 import { ScreenHeader } from "@components/ScreenHeader";
-import { Heading, VStack, Text } from "@gluestack-ui/themed";
+import { Heading, VStack, Text, useToast } from "@gluestack-ui/themed";
+import { AppError } from "@utils/AppError";
+import { ToastMessage } from "@components/ToastMessage";
+import { api } from "@services/api";
+import { useFocusEffect } from "@react-navigation/native";
+import { HistoryByDayDTO } from "@dtos/HistoryByDayDTO";
 
 export function History() {
-    const [exercises, setExercises] = useState([
-        {
-            title: "22.08.2024",
-            data: ["puxada frontal", "remada unilateral"],
-        },
-        {
-            title: "21.08.2024",
-            data: ["puxada frontal"],
-        } 
-    ])
+    const toast = useToast();
+    const [isLoading, setIsLoading] = useState(true);
+    const [exercises, setExercises] = useState<HistoryByDayDTO[]>([]);
+
+    const fetchHistory = async () => {
+        try {
+            setIsLoading(true);
+            const response = await api.get('/history');
+            setExercises(response.data)
+
+        } catch (error) {
+            console.log(error);
+            const isAppError = error instanceof AppError;
+            const title = isAppError ? error.message : 'Não foi possível carregar o histórico.';
+            toast.show({
+                placement: 'top',
+                render: ({ id }) => (
+                    <ToastMessage
+                        id={id}
+                        action="error"
+                        title={title}
+                    />
+                )
+            })
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useFocusEffect(useCallback(() => {
+        fetchHistory();
+    }, []))
 
     return (
         <VStack flex={1}>
@@ -22,8 +49,8 @@ export function History() {
 
             <SectionList  
                 sections={exercises}
-                keyExtractor={(item) => item}
-                renderItem={() => <HistoryCard />}
+                keyExtractor={(item) => item.id}
+                renderItem={({item}) => <HistoryCard data={item}/>}
                 renderSectionHeader={({section}) => (
                     <Heading color="$gray200" fontSize="$md" 
                         mt="$10" mb="$3" fontFamily="$heading">

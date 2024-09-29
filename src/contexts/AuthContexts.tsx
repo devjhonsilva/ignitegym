@@ -3,7 +3,7 @@ import { createContext, ReactNode, useEffect, useState } from "react";
 import { api } from "../service/api";
 import { storageAuthTokenGet, storageAuthTokenRemove, storageAuthTokenSave } from "@storage/storageAuthToken";
 import { storageUserSave, storageUserGet, storageUserRemove } from "@storage/storageUser";
-import { Use } from "react-native-svg";
+
 
 export type AuthContextDataProps = {
     user: UserDTO;
@@ -18,18 +18,20 @@ type AuthContextProviderProps = {
 
 export const AuthContext = createContext<AuthContextDataProps>({} as AuthContextDataProps);
 
+
 export function AuthContextProvider({ children }: AuthContextProviderProps) {
     const [user, setUser] = useState<UserDTO>({} as UserDTO);
     const [isLoadingUserStorageData, setIsLoadingUserStorageData] = useState(true);
 
     async function userAndTokenUpdate(userData: UserDTO, token: string) {
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        setUser(userData);
+        setUser({...userData, token});
     }
 
     async function storageUserAndTokenSave(userData: UserDTO, token: string) {
         try {
             setIsLoadingUserStorageData(true);
+            
             await storageUserSave(userData);
             await storageAuthTokenSave(token);
         } catch (error) {
@@ -42,7 +44,6 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     async function signIn(email: string, password: string) {
         try {
             const { data } = await api.post('/sessions', { email, password });
-
             if (data.user && data.token) {
                 await storageUserAndTokenSave(data.user, data.token)
                 userAndTokenUpdate(data.user, data.token);
@@ -56,7 +57,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
     async function signOut() {
         try {
-            setIsLoadingUserStorageData(true)
+            setIsLoadingUserStorageData(true);
             setUser({} as UserDTO);
             await storageUserRemove();
             await storageAuthTokenRemove();
@@ -95,7 +96,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
                 user,
                 signIn,
                 signOut,
-                isLoadingUserStorageData
+                isLoadingUserStorageData,
             }}>
             {children}
         </AuthContext.Provider>
