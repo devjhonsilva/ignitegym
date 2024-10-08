@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ScrollView, TouchableOpacity } from "react-native";
-import { Center, Heading, Text, VStack, onChange, useToast } from "@gluestack-ui/themed";
+import { Center, Heading, Text, VStack, useToast } from "@gluestack-ui/themed";
+import defaultUserPhotoImg from '@assets/userPhotoDefault.png'
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import * as yup from 'yup';
@@ -12,23 +13,60 @@ import { Input } from "@components/Input";
 import { Button } from "@components/Button";
 import { ToastMessage } from "@components/ToastMessage";
 import { useAuth } from "@hooks/useAuth";
+import { Loading } from "@components/Loading";
+import { api } from "@services/api";
+import { AppError } from "@utils/AppError";
+import axios from "axios";
+import mime from 'mime';
+
+type FormDataProps = {
+    name: string;
+    email?: string;
+    old_password: string;
+    password: string;
+    confirm_password: string | any | undefined;
+};
 
 const profileSchema = yup.object({
-    name: yup.string().required('Informe o nome.'),
-    email: yup.string().required('Informe o e-mail.').email('E-mail inválido.'),
-    old_password: yup.string().nullable(),
-    new_password: yup.string().min(6, 'A senha deve ter pelo menos 6 dígitos.').nullable(),
-    confirm_password: yup.string()
-        .oneOf([yup.ref('new_password'), 'null'], 'As senhas não estão iguais!')
-        .nullable(),
-});
+    name: yup
+        .string()
+        .required('Informe o nome'),
+    email: yup
+        .string(),
+    old_password: yup
+        .string()
+        .transform((value) => value === '' ? undefined : value),
+    password: yup
+        .string()
+        .min(6, 'A senha deve ter pelo menos 6 dígitos.')
+        .nullable()
+        .transform((value) => value === '' ? undefined : value),
+    confirm_password: yup
+        .string()
+        .nullable()
+        .transform((value) => value === '' ? undefined : value)
+        .oneOf([yup.ref('password'), null], 'A confirmação de senha não confere.')
+        .when('password', {
+            is: (Field: any) => Field,
+            then: (schema) => schema
+                .required('Informe a confirmação da senha.')
+                .nullable()
+                .transform((value) => !!value ? value : null)
+                .oneOf([yup.ref('password')], 'A confirmação de senha não confere.'),
+            otherwise: (schema) => schema.notRequired(),
+        }),
+})
+type ProfileSchemaType = yup.InferType<typeof profileSchema>;
 
 export function Profile() {
-    const [userPhoto, setUserPhoto] = useState("https:github.com/devjhonsilva.png")
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [photoIsLoading, setPhotoIsLoading] = useState(false);
+    const [userPhoto, setUserPhoto] = useState("https:github.com/devjhonsilva.png");
 
     const toast = useToast();
-    const { user } = useAuth();
-    const { control, handleSubmit, formState: { errors } } = useForm({
+    const { user, updateUserProfile } = useAuth();
+
+    const { control, handleSubmit, formState: { errors } } = useForm<ProfileSchemaType>({
         defaultValues: {
             name: user.name,
             email: user.email,
@@ -38,6 +76,7 @@ export function Profile() {
 
     async function handleUserPhotoSelect() {
         try {
+            setPhotoIsLoading(true);
             const photoSelected = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 quality: 1,
@@ -70,15 +109,101 @@ export function Profile() {
                         )
                     })
                 }
-                setUserPhoto(photoURI)
+                const fileExtension = photoURI.split('.').pop();
+
+                const photoFile = {
+                    name: `${user.name}.${fileExtension}`.toLowerCase(),
+                    uri: photoSelected.assets[0].uri,
+                    type: mime.getType(`${photoSelected.assets[0].uri}`)
+                } as any;
+
+                const userPhotoUploadForm = new FormData();
+                userPhotoUploadForm.append('avatar', photoFile);
+
+                const avatarUpdatedResponse = await api.patch('/users/avatar', userPhotoUploadForm, {
+                    headers: {
+                        accept: 'application/json',
+                        'Content-Type': 'multipart/form-data'
+                    },
+                });
+
+                const userUpdated = user;
+                userUpdated.avatar = avatarUpdatedResponse.data.avatar;
+                updateUserProfile(userUpdated);
+
+                toast.show({
+                    placement: 'top',
+                    render: ({ id }) => (
+                        <ToastMessage
+                            id={id}
+                            action="success"
+                            title="Foto atualizada com sucesso!"
+                        />
+                    )
+                })
+
             }
         } catch (error) {
-            console.log(error)
+            console.log('Detalhes do erro de rede:', error);
+            if (axios.isAxiosError(error)) {
+                console.error('Erro do Axios:', error.response?.data || error.message);
+            }
+            const isAppError = error instanceof AppError;
+            const title = isAppError ? error.message : 'Não foi possível atualizar a foto, tente novamente mais tarde.';
+            toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                    <ToastMessage
+                        id={id}
+                        action="error"
+                        title={title}
+                        onClose={() => toast.close(id)}
+                    />
+                )
+            })
+        } finally {
+            setPhotoIsLoading(false);
         }
     }
 
-    const handleProfileUpdate = async (data: any) => {
-        console.log(data)
+    const handleProfileUpdate = async (data: ProfileSchemaType) => {
+        try {
+            setIsUpdating(true);
+
+            const userUpdated = user;
+            userUpdated.name = data.name;
+
+            await api.put('/users', data);
+
+            await updateUserProfile(userUpdated);
+            toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                    <ToastMessage
+                        id={id}
+                        action="success"
+                        title="Perfil atualizado com sucesso!"
+                        onClose={() => toast.close(id)}
+                    />
+                )
+            })
+        } catch (error) {
+            const isAppError = error instanceof AppError;
+            const title = isAppError ? error.message : 'Não foi possível atualizar os dados, tente novamente mais tarde.';
+            toast.show({
+                placement: "top",
+                render: ({ id }) => (
+                    <ToastMessage
+                        id={id}
+                        action="error"
+                        title={title}
+                        onClose={() => toast.close(id)}
+                    />
+                )
+            })
+        } finally {
+            setIsUpdating(false)
+        }
     }
 
     return (
@@ -86,11 +211,15 @@ export function Profile() {
             <ScreenHeader title="Perfil" />
             <ScrollView contentContainerStyle={{ paddingBottom: 36 }}>
                 <Center mt="$6" px="$10" >
-                    <UserPhoto
-                        source={{ uri: userPhoto }}
-                        alt="Foto do usuário"
-                        size="xl"
-                    />
+                    {
+                        photoIsLoading ? <Loading /> : (
+                            <UserPhoto
+                            source={user.avatar ? {uri: `${api.defaults.baseURL}/avatar/${user.avatar}`} : defaultUserPhotoImg }
+                                alt="Foto do usuário"
+                                size="xl"
+                            />
+                        )
+                    }
                     <TouchableOpacity onPress={handleUserPhotoSelect}>
                         <Text color="$green500" fontFamily="$heading" fontSize="$md" mt="$2" mb="$4">
                             Alterar foto</Text>
@@ -105,6 +234,7 @@ export function Profile() {
                                     placeholder="Nome"
                                     bg="$gray600"
                                     onChangeText={onChange}
+                                    autoCorrect={false}
                                     value={value}
                                     errorMessage={errors.name?.message}
                                 />
@@ -145,14 +275,14 @@ export function Profile() {
                         />
                         <Controller
                             control={control}
-                            name="new_password"
+                            name="password"
                             render={({ field: { onChange } }) => (
                                 <Input
                                     placeholder="Nova senha"
                                     bg="$gray600"
                                     onChangeText={onChange}
                                     secureTextEntry
-                                    errorMessage={errors.new_password?.message}
+                                    errorMessage={errors.password?.message}
                                 />
                             )}
                         />
@@ -172,6 +302,7 @@ export function Profile() {
                         <Button
                             title="Atualizar"
                             onPress={handleSubmit(handleProfileUpdate)}
+                            isLoading={isUpdating}
                         />
                     </Center>
                 </Center>
