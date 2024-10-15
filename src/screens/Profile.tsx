@@ -80,7 +80,7 @@ export function Profile() {
             const photoSelected = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 quality: 1,
-                aspect: [4, 4],
+                aspect: [6, 5],
                 allowsEditing: true,
             })
 
@@ -122,8 +122,7 @@ export function Profile() {
 
                 const avatarUpdatedResponse = await api.patch('/users/avatar', userPhotoUploadForm, {
                     headers: {
-                        accept: 'application/json',
-                        'Content-Type': 'multipart/form-data'
+                           'Content-Type': 'multipart/form-data'
                     },
                 });
 

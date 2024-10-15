@@ -50,7 +50,7 @@ api.registerInterceptTokenManager = signOut => {
                         console.log("token atualizado", data)
                         await storageAuthTokenSave({token: data.token, refresh_token: data.refresh_token});
 
-                        if(originalRequestConfig.data){
+                        if(typeof originalRequestConfig.data === 'string'){
                             originalRequestConfig.data = JSON.parse(originalRequestConfig.data);
                         }
                         originalRequestConfig.headers = { 'Authorization': `Bearer ${data.token}` };
